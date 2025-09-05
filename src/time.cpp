@@ -33,8 +33,6 @@ Date Clock::get_local_date() const noexcept {
   };
 }
 
-Stopwatch Clock::make_stopwatch() const noexcept { return Stopwatch(*this); }
-
 Stopwatch::Stopwatch(const Clock &_clock) noexcept
     : clock(_clock), start_time(0), is_started(false) {}
 Stopwatch::Stopwatch(const Stopwatch &other) noexcept

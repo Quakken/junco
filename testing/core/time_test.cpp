@@ -16,7 +16,7 @@ TEST(ClockTests, LocalTime) {
 
 TEST(StopwatchTests, InvalidStart) {
   auto clock = junco::Clock{};
-  auto sw = clock.make_stopwatch();
+  auto sw = junco::Stopwatch(clock);
   ASSERT_EQ(sw.stop(), 0);
   ASSERT_FALSE(sw.started());
 }

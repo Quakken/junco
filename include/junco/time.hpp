@@ -12,7 +12,6 @@
 #include <chrono> // std::chrono
 
 namespace junco {
-class Stopwatch;
 
 /**
  * Stores information about local time, using std::chrono units.
@@ -58,11 +57,6 @@ public:
 
   Time get_local_time() const noexcept;
   Date get_local_date() const noexcept;
-
-  /**
-   * Creates a new stopwatch which uses this clock's time info.
-   */
-  Stopwatch make_stopwatch() const noexcept;
 
 private:
   using chrono_clock = std::chrono::high_resolution_clock;
