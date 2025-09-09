@@ -122,3 +122,14 @@ TEST(LogTesting, DefaultThreadSafety) {
     EXPECT_TRUE(message_is_valid);
   }
 }
+
+/**
+ * Sends a log message through each channel to demonstrate their appearance.
+ */
+TEST(LogTesting, DefaultLevelDemo) {
+  junco::Log::trace("This is a trace message!");
+  junco::Log::standard("This is a standard message!");
+  junco::Log::warning("This is a warning!");
+  junco::Log::error("This is an error!");
+  junco::Log::fatal("This was a fatal error!");
+}

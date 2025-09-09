@@ -154,19 +154,23 @@ public:
 
 private:
   static void default_trace(const std::string &msg) noexcept {
-    std::osyncstream(std::cout) << msg << std::endl;
+    std::osyncstream(std::cout)
+        << "\033[2;3m" << msg << "\033[22;23m" << std::endl;
   }
   static void default_standard(const std::string &msg) noexcept {
     std::osyncstream(std::cout) << msg << std::endl;
   }
   static void default_warning(const std::string &msg) noexcept {
-    std::osyncstream(std::cerr) << "[warning]" << msg << std::endl;
+    std::osyncstream(std::cerr)
+        << "\033[33m(warning) " << msg << "\033[39m" << std::endl;
   }
   static void default_error(const std::string &msg) noexcept {
-    std::osyncstream(std::cerr) << "[error]" << msg << std::endl;
+    std::osyncstream(std::cerr)
+        << "\033[31m(error) " << msg << "\033[39m" << std::endl;
   }
   static void default_fatal(const std::string &msg) noexcept {
-    std::osyncstream(std::cerr) << "[fatal]" << msg << std::endl;
+    std::osyncstream(std::cerr)
+        << "\033[7;31;1m(fatal)\033[27m " << msg << "\033[39;21m" << std::endl;
   }
 
   inline static LogFunctions functions{};
