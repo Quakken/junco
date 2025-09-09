@@ -3,6 +3,8 @@
 #include <iostream>
 #include <thread> // std::this_thread::sleep_for
 
+// #define LONG_TESTS // Comment out to ignore tests with sleeping
+
 TEST(ClockTests, Time) {
   auto clock = junco::Clock{};
   ASSERT_GE(clock.get_time(), 0);
@@ -24,6 +26,7 @@ TEST(StopwatchTests, InvalidStart) {
 // TODO: Make this not use std::this_thread::sleep_for
 // Introduce mock std::chrono clocks to pass to clock's template
 TEST(StopwatchTests, RecordTime) {
+#ifdef LONG_TESTS
   using namespace std::chrono_literals;
   auto clock = junco::Clock{};
   auto sw = junco::Stopwatch(clock);
@@ -32,4 +35,5 @@ TEST(StopwatchTests, RecordTime) {
   ASSERT_GE(sw.stop(), 1);
   ASSERT_EQ(sw.stop(), 0);
   ASSERT_EQ(sw.get_time(), 0);
+#endif
 }
