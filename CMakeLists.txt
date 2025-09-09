@@ -7,7 +7,7 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 add_subdirectory("${CMAKE_SOURCE_DIR}/src/")
 
-option(BUILD_TESTS "Whether tests (from ./testing/) should be built." true)
+option(BUILD_TESTS "Whether tests (from ./testing/) should be built." ON)
 if (BUILD_TESTS)
     add_subdirectory("${CMAKE_SOURCE_DIR}/testing/")
 endif()

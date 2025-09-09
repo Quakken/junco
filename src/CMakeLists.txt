@@ -7,8 +7,9 @@ target_include_directories(${PROJECT_NAME}_lib PUBLIC
 )
 
 # Export compile definitions
-target_compile_definitions(${PROJECT_NAME}_lib PRIVATE
-    $<$<CONFIG:Debug>:JUNCO_BUILD_DEBUG>
-    $<$<CONFIG:Release>:JUNCO_BUILD_RELEASE>
-    $<$<CONFIG:RelWithDebInfo>:JUNCO_BUILD_RELWITHDEBINFO>
+# Has to be made public because of log definitions
+target_compile_definitions(${PROJECT_NAME}_lib PUBLIC
+    $<$<CONFIG:Debug>:JC_BUILD_DEBUG>
+    $<$<CONFIG:Release>:JC_BUILD_RELEASE>
+    $<$<CONFIG:RelWithDebInfo>:JC_BUILD_RELWITHDEBINFO>
 )
