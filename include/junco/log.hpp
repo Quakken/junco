@@ -1,8 +1,12 @@
 /**
  * @file junco/log.hpp
  *
- * Defines junco's logging utilities, which allow for basic log channels,
- * formatting, and stream redirection.
+ * Defines junco's logging utilities, which allow for custom Loggers to be used
+ * through a uniform LoggerTraits interface, reducing boilerplate.
+ *
+ * Junco's default logger (junco::Log) also allows the user to configure its
+ * logging functions at runtime, letting the the user decide how messages are
+ * recorded.
  */
 #pragma once
 
@@ -30,6 +34,11 @@ concept Logger = requires(std::string msg) {
   { T::fatal(msg) } -> std::same_as<void>;
 };
 
+/**
+ * Provides a common interface for sending messages through a Logger object.
+ * LoggerTraits handles formatting and inlining, so that log methods are only
+ * included in source files when logging is enabled.
+ */
 template <Logger T> class LoggerTraits final {
 public:
   template <typename... Args>
@@ -81,6 +90,11 @@ private:
   }
 };
 
+/**
+ * All functions that can be overwritten for junco's default logger.
+ * @note When overwriting log functions, be sure to account for parallel access.
+ * Use std::osyncstream or other for thread safety.
+ */
 struct LogFunctions {
   using LogFunction = void (*)(const std::string &);
   LogFunction trace;
@@ -88,9 +102,16 @@ struct LogFunctions {
   LogFunction warning;
   LogFunction error;
   LogFunction fatal;
+  // Overwrites all log channels with the given function. Note that, if defined,
+  // this is the ONLY function that will be used for logging (all other
+  // overwritten functions are ignored).
   LogFunction all;
 };
 
+/**
+ * Implementation for junco's default logger. Uses thread-safe logging methods
+ * by default, which can be overwritten with user-defined functions.
+ */
 class StandardLogger final {
 public:
   static void trace(const std::string &msg) noexcept {
