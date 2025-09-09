@@ -45,7 +45,7 @@ public:
   inline static void trace(std::format_string<Args...> fmt,
                            Args &&...args) noexcept {
 #ifdef JC_ENABLE_LOGGING
-    auto message = format_with_args(fmt, args...);
+    auto message = std::format(fmt, std::forward<Args>(args)...);
     T::trace(message);
 #endif
   }
@@ -53,7 +53,7 @@ public:
   inline static void standard(std::format_string<Args...> fmt,
                               Args &&...args) noexcept {
 #ifdef JC_ENABLE_LOGGING
-    auto message = format_with_args(fmt, args...);
+    auto message = std::format(fmt, std::forward<Args>(args)...);
     T::standard(message);
 #endif
   }
@@ -61,7 +61,7 @@ public:
   inline static void warning(std::format_string<Args...> fmt,
                              Args &&...args) noexcept {
 #ifdef JC_ENABLE_LOGGING
-    auto message = format_with_args(fmt, args...);
+    auto message = std::format(fmt, std::forward<Args>(args)...);
     T::warning(message);
 #endif
   }
@@ -69,7 +69,7 @@ public:
   inline static void error(std::format_string<Args...> fmt,
                            Args &&...args) noexcept {
 #ifdef JC_ENABLE_LOGGING
-    auto message = format_with_args(fmt, args...);
+    auto message = std::format(fmt, std::forward<Args>(args)...);
     T::error(message);
 #endif
   }
@@ -77,16 +77,9 @@ public:
   inline static void fatal(std::format_string<Args...> fmt,
                            Args &&...args) noexcept {
 #ifdef JC_ENABLE_LOGGING
-    auto message = format_with_args(fmt, args...);
+    auto message = std::format(fmt, std::forward<Args>(args)...);
     T::fatal(message);
 #endif
-  }
-
-private:
-  template <typename... Args>
-  inline static std::string format_with_args(std::format_string<Args...> fmt,
-                                             Args &&...args) noexcept {
-    return std::format(fmt, args...);
   }
 };
 
@@ -167,13 +160,13 @@ private:
     std::osyncstream(std::cout) << msg << std::endl;
   }
   static void default_warning(const std::string &msg) noexcept {
-    std::osyncstream(std::cerr) << msg << std::endl;
+    std::osyncstream(std::cerr) << "[warning]" << msg << std::endl;
   }
   static void default_error(const std::string &msg) noexcept {
-    std::osyncstream(std::cerr) << msg << std::endl;
+    std::osyncstream(std::cerr) << "[error]" << msg << std::endl;
   }
   static void default_fatal(const std::string &msg) noexcept {
-    std::osyncstream(std::cerr) << msg << std::endl;
+    std::osyncstream(std::cerr) << "[fatal]" << msg << std::endl;
   }
 
   inline static LogFunctions functions{};

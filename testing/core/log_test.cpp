@@ -55,6 +55,19 @@ TEST(LogTesting, CustomFormat) {
   }
 }
 
+TEST(LogTesting, CustomMultipleArgs) {
+  for (int i = 0; i < 4; ++i) {
+    for (int j = 0; j < 4; ++j) {
+      for (int k = 0; k < 4; ++k) {
+        auto expected = std::format("{}, {}, {}", i, j, k);
+        ComparisonLogger::set_expected(expected);
+        CompareLog::standard("{}, {}, {}", i, j, k);
+        EXPECT_TRUE(ComparisonLogger::did_match());
+      }
+    }
+  }
+}
+
 /**
  * Tests junco's default logger and its ability to redirect log functions.
  */
