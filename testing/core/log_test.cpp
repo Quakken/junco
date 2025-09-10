@@ -5,6 +5,10 @@
 #include <string>
 #include <thread>
 
+// Include this to send a message through each log stream to demonstrate their
+// appearance
+// #define DO_LOG_DEMO
+
 /**
  * Custom logger specialized for comparing the result of a log operation to an
  * expected value.
@@ -126,6 +130,7 @@ TEST(LogTesting, DefaultThreadSafety) {
 /**
  * Sends a log message through each channel to demonstrate their appearance.
  */
+#ifdef DO_LOG_DEMO
 TEST(LogTesting, DefaultLevelDemo) {
   junco::Log::trace("This is a trace message!");
   junco::Log::standard("This is a standard message!");
@@ -133,3 +138,4 @@ TEST(LogTesting, DefaultLevelDemo) {
   junco::Log::error("This is an error!");
   junco::Log::fatal("This was a fatal error!");
 }
+#endif
