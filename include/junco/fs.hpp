@@ -51,7 +51,7 @@ public:
   /**
    * Retrieves the entire contents of the file.
    */
-  std::string get_contents() const noexcept;
+  std::string get_contents() noexcept;
   /**
    * Overwrites the entire contents of the file.
    */
@@ -67,6 +67,8 @@ public:
    * Reads a number of bytes from the file, starting at the given position.
    */
   std::string read(const std::size_t &pos, const std::size_t &count) noexcept;
+
+  void clear() noexcept;
 
   void set_name(const std::string &new_name) noexcept;
   std::string get_name() const noexcept;
@@ -128,8 +130,8 @@ private:
 
   bool file_exists(const std::string &name) const noexcept;
   bool directory_exists(const std::string &name) const noexcept;
-  bool file_is_cached(const std::string &name) const noexcept;
-  bool directory_is_cached(const std::string &name) const noexcept;
+  bool file_is_cached(const std::string &name) noexcept;
+  bool directory_is_cached(const std::string &name) noexcept;
 
   void cache_file(const std::string &name) noexcept;
   void cache_directory(const std::string &name) noexcept;

@@ -5,27 +5,26 @@
  */
 
 #include "junco/fs.hpp"  // junco::File, junco::Directory, junco::FileSystem
-#include <chrono>        // std::chrono_literals
 #include <filesystem>    // std::filesystem
 #include <gtest/gtest.h> // Testing
 #include <thread>        // std::thread
 
 // Whether to setup the project's filesystem before running tests.
-#define DO_SETUP false
-
-using namespace std::chrono_literals;
-void wait_for_work() { std::this_thread::sleep_for(10ms); }
+#define DO_SETUP true
 
 // Path to the binary output directory.
 const auto root_path = std::filesystem::current_path();
-
 junco::FileSystem testing_fs{root_path};
 
-void expect_file_contents(const junco::File &file, const char *expected) {
+void expect_file_contents(junco::File &file, const char *expected) {
   auto f_contents = file.get_contents();
-  auto f_contents_cstr = f_contents.c_str();
-  EXPECT_STREQ(expected, f_contents_cstr);
+  EXPECT_STREQ(expected, f_contents.c_str());
 }
+
+// Messages for all of the test files
+constexpr const char *test_contents[] = {
+    "This is a message read from the first test!",
+    "This is a message written to the second test!"};
 
 /**
  * Initializes the test's structure.
@@ -37,7 +36,7 @@ void expect_file_contents(const junco::File &file, const char *expected) {
 TEST(FileTesting, Setup) {
   auto &test_dir = testing_fs.open_directory("fs_test");
   auto &test1 = test_dir.open_file("test1.txt");
-  test1.set_contents("These are the contents of the first file!");
+  test1.set_contents(test_contents[0]);
 }
 #endif
 
@@ -50,17 +49,13 @@ TEST(FileTesting, FileInput) {
   // get_contents()
   {
     auto contents = file.get_contents();
-    auto contents_cstr = contents.c_str();
-    EXPECT_STREQ("These are the contents of the first test file!",
-                 contents_cstr);
+    EXPECT_STREQ(test_contents[0], contents.c_str());
   }
   // read()
   {
     auto size = file.get_size();
     auto contents = file.read(0, size);
-    auto contents_cstr = contents.c_str();
-    EXPECT_STREQ("These are the contents of the first test file!",
-                 contents_cstr);
+    EXPECT_STREQ(test_contents[0], contents.c_str());
   }
 }
 
@@ -71,21 +66,22 @@ TEST(FileTesting, FileOutput) {
   auto &file = testing_fs.open_file("fs_test/test2.txt");
   // set_contents()
   {
-    file.set_contents("These are the contents of the second file!");
-    expect_file_contents(file, "These are the contents of the second file!");
+    file.set_contents(test_contents[1]);
+    expect_file_contents(file, test_contents[1]);
     // Erase file contents
-    file.set_contents("");
+    file.clear();
   }
   // write()
   {
-    file.write("These are the contents of the second file!", 0);
-    expect_file_contents(file, "These are the contents of the second file!");
-    file.set_contents("");
+    file.write(test_contents[1], 0);
+    expect_file_contents(file, test_contents[1]);
+    file.clear();
   }
   // append()
   {
-    file.append("These are the contents of the second file!");
-    expect_file_contents(file, "These are the contents of the second file!");
+    file.append(test_contents[1]);
+    expect_file_contents(file, test_contents[1]);
+    file.clear();
   }
 }
 /**
@@ -93,17 +89,22 @@ TEST(FileTesting, FileOutput) {
  */
 TEST(FileTesting, FileOps) {
   auto &file = testing_fs.open_file("fs_test/test3.txt");
+
   auto name = file.get_name();
-  auto name_cstr = name.c_str();
-  EXPECT_STREQ("test3.txt", name_cstr);
+  EXPECT_STREQ("test3.txt", name.c_str());
+
   auto extension = file.get_extension();
-  auto extension_cstr = extension.c_str();
-  EXPECT_STREQ("txt", extension_cstr);
+  EXPECT_STREQ(".txt", extension.c_str());
+
   auto stem = file.get_stem();
-  auto stem_cstr = stem.c_str();
-  EXPECT_STREQ("test3", stem_cstr);
-  // auto path = file.get_path();
-  // TODO: Path should be relative to filesystem root dir
+  EXPECT_STREQ("test3", stem.c_str());
+
+  auto path = file.get_path();
+  auto path_str = path.string();
+  auto expected_path = root_path / "fs_test" / "test3.txt";
+  auto expected_path_str = expected_path.string();
+  EXPECT_STREQ(expected_path_str.c_str(), path_str.c_str());
+
   auto size = file.get_size();
   EXPECT_EQ(0, size);
 }

@@ -5,43 +5,40 @@
 
 namespace junco {
 File::File(const std::filesystem::path &_path) noexcept
-    : path(_path), fstream(path) {}
-
-std::string File::get_contents() const noexcept {
-  auto string_buff = std::ostringstream{};
-  {
-    auto lock = std::shared_lock(rw_mutex);
-    string_buff << fstream.rdbuf();
-  }
-  return string_buff.str();
+    : path(_path), fstream(path, std::ios::in | std::ios::out | std::ios::ate) {
 }
+
+std::string File::get_contents() noexcept { return read(0, get_size()); }
 std::string File::read(const std::size_t &pos,
                        const std::size_t &count) noexcept {
   auto buff = std::string(count, '\0');
   {
     // This has to be a unique lock because of seekg.
     auto lock = std::unique_lock(rw_mutex);
-    fstream.seekg(pos);
+    fstream.clear();
+    fstream.seekg(pos, std::ios::beg);
     fstream.read(&buff[0], count);
   }
   return buff;
 }
 
 void File::set_contents(const std::string &new_contents) noexcept {
+  clear();
+  write(new_contents, 0);
+}
+void File::clear() noexcept {
   auto lock = std::unique_lock(rw_mutex);
   // Re-open filestream with truncate flag to clear contents
-  fstream.open(path, std::fstream::trunc);
-  fstream << new_contents;
+  fstream.close();
+  fstream.open(path, std::ios::in | std::ios::out | std::ios::trunc);
 }
-void File::append(const std::string &data) noexcept {
-  auto lock = std::unique_lock(rw_mutex);
-  fstream << data;
-}
+void File::append(const std::string &data) noexcept { write(data, get_size()); }
 void File::write(const std::string &data, const std::size_t &pos) noexcept {
   auto lock = std::unique_lock(rw_mutex);
-  fstream.seekg(pos);
-  auto buffer = data.c_str();
-  fstream.write(buffer, data.size());
+  fstream.clear();
+  fstream.seekp(pos, std::ios::beg);
+  fstream.write(data.c_str(), data.size());
+  fstream.flush(); // <-- This is necessary.
 }
 
 void File::set_name(const std::string &new_name) noexcept {
@@ -58,7 +55,7 @@ std::string File::get_extension() const noexcept {
   return extension.string();
 }
 std::string File::get_stem() const noexcept {
-  auto stem = path.extension();
+  auto stem = path.stem();
   return stem.string();
 }
 std::filesystem::path File::get_path() const noexcept { return path; }
@@ -107,11 +104,11 @@ Directory &Directory::get_parent() const {
   return *parent;
 }
 
-bool Directory::file_is_cached(const std::string &name) const noexcept {
+bool Directory::file_is_cached(const std::string &name) noexcept {
   auto lock = std::shared_lock(rw_mutex);
   return cached_files.find(name) != cached_files.end();
 }
-bool Directory::directory_is_cached(const std::string &name) const noexcept {
+bool Directory::directory_is_cached(const std::string &name) noexcept {
   auto lock = std::shared_lock(rw_mutex);
   return cached_directories.find(name) != cached_directories.end();
 }
@@ -146,7 +143,7 @@ void Directory::cache_directory(const std::string &name) noexcept {
 }
 
 void Directory::create_file(const std::string &name) noexcept {
-  auto _ = std::ofstream(name);
+  auto _ = std::ofstream(path / name);
 }
 void Directory::create_directory(const std::string &name) noexcept {
   std::filesystem::create_directory(path / name);
@@ -176,7 +173,12 @@ Directory &FileSystem::open_directory(const std::filesystem::path &path) {
     auto entry_name = it->string();
     if (it == --path.end())
       return current_dir->open_directory(entry_name);
-    current_dir = &current_dir->get_directory(entry_name);
+    if (entry_name == "." || entry_name.empty())
+      continue;
+    if (entry_name == "..")
+      current_dir = &current_dir->get_parent();
+    else
+      current_dir = &current_dir->get_directory(entry_name);
   }
   throw FileNotFoundException("Could not find file at the given location");
 }
