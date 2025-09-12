@@ -16,6 +16,7 @@ FetchContent_MakeAvailable(googletest)
 add_executable(${PROJECT_NAME}_tests
     "${CMAKE_CURRENT_SOURCE_DIR}/core/time_test.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/core/log_test.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/core/fs_test.cpp"
 )
 target_link_libraries(${PROJECT_NAME}_tests PRIVATE
     ${PROJECT_NAME}_lib

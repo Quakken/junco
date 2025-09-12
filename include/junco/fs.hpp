@@ -7,9 +7,9 @@
 
 #pragma once
 
-#include <atomic>        // std::atomic_bool
-#include <filesystem>    // std::filesystem
-#include <fstream>       // std::fstream, std::ifstream
+#include <filesystem> // std::filesystem
+#include <fstream>    // std::fstream, std::ifstream
+#include <shared_mutex>
 #include <string>        // std::string
 #include <unordered_map> // std::unordered_map
 
@@ -17,9 +17,9 @@
 
 namespace junco {
 
-class WriteLock;
-class ReadLock;
 class DirectoryEntry;
+class FileSystem;
+class Directory;
 
 class FileSystemException : public Exception {
 public:
@@ -33,84 +33,10 @@ public:
       : FileSystemException(what) {}
 };
 
-/**
- * Object that helps orchestrate safe reads/writes to concurrently accessed
- * data.
- * At any point in time, a ReadWriteGuard can have either...
- *   - one writer, and no readers
- *   - no writers, and any number of readers
- */
-class ReadWriteGuard {
+class InvalidPathException : public FileSystemException {
 public:
-public:
-  /**
-   * Blocks the current thread until a write lock for the guarded resource can
-   * be retrieved.
-   */
-  WriteLock get_write_lock() noexcept;
-  /**
-   * Blocks the current thread until a read lock for the guarded resource can be
-   * retrieved.
-   */
-  ReadLock get_read_lock() noexcept;
-
-  bool is_writing() const noexcept;
-  bool is_reading() const noexcept;
-
-private:
-  friend ReadLock;
-  friend WriteLock;
-
-  /**
-   * Blocks until the resource is in a safe state to write to (no
-   * readers/writers).
-   */
-  void await_write() const noexcept;
-  /**
-   * Blocks until the resource is in a safe state to read from (no writers)
-   */
-  void await_read() const noexcept;
-
-  std::atomic_bool writing;
-  std::atomic_int reading;
-};
-
-/**
- * Holds read access to a ReadWriteGuard until destroyed.
- */
-class [[nodiscard("ReadLock uses RAII to release read access on guard.")]]
-ReadLock {
-public:
-  ReadLock(ReadWriteGuard &guard) noexcept : rw_guard(guard) {
-    rw_guard.reading++;
-  }
-  ~ReadLock();
-  // TODO: Move constructor?
-
-  ReadLock(const ReadLock &) = delete;
-  ReadLock &operator=(const ReadLock &) = delete;
-
-private:
-  ReadWriteGuard &rw_guard;
-};
-
-/**
- * Holds write access to a ReadWriteGuard until destroyed.
- */
-class [[nodiscard("WriteLock uses RAII to release write access on guard.")]]
-WriteLock {
-public:
-  WriteLock(ReadWriteGuard &guard) noexcept : rw_guard(guard) {
-    rw_guard.writing = true;
-  }
-  ~WriteLock();
-  // TODO: Move constructor?
-
-  WriteLock(const WriteLock &) = delete;
-  WriteLock &operator=(const WriteLock &) = delete;
-
-private:
-  ReadWriteGuard &rw_guard;
+  InvalidPathException(const char *what = "InvalidPath exception") noexcept
+      : FileSystemException(what) {}
 };
 
 /**
@@ -118,26 +44,9 @@ private:
  */
 class File final {
 public:
-  File(const std::filesystem::path &path) noexcept;
-  ~File() = default;
-
   // Files in junco are always passed by reference, never by value.
   File(const File &) = delete;
   File &operator=(const File &) = delete;
-
-  // TODO: Figure out how to manage this operation with internal file state.
-  // This should be a read operation, but since fstream tracks next token,
-  // it is actually a write op.
-  template <typename T> File &operator>>(T &obj) noexcept {
-    auto lock = rw_guard.get_write_lock();
-    wrapped >> obj;
-    return *this;
-  }
-  template <typename T> File &operator<<(T &obj) noexcept {
-    auto lock = rw_guard.get_write_lock();
-    wrapped << obj;
-    return *this;
-  }
 
   /**
    * Retrieves the entire contents of the file.
@@ -167,16 +76,17 @@ public:
   std::size_t get_size() const noexcept;
 
 private:
-  ReadWriteGuard rw_guard;
+  friend Directory;
+  explicit File(const std::filesystem::path &path) noexcept;
+
+  std::shared_mutex rw_mutex;
 
   std::filesystem::path path;
-  std::fstream wrapped;
+  std::fstream fstream;
 };
 
 class Directory final {
 public:
-  Directory(const std::filesystem::path &path) noexcept;
-
   Directory(const Directory &other) = delete;
   Directory &operator=(const Directory &other) noexcept = delete;
 
@@ -186,38 +96,51 @@ public:
    * Opens the file at the given location relative to this directory. Throws
    * exception if no such file exists.
    */
-  File &get_file(const std::filesystem::path &path);
-  const File &get_file(const std::filesystem::path &path) const;
+  File &get_file(const std::string &name);
 
   /**
    * Opens the directory at the given location relative to this directory.
    * Throws an exception if no such directory exists.
    */
-  Directory &get_directory(const std::filesystem::path &path);
-  const Directory &get_directory(const std::filesystem::path &path) const;
+  Directory &get_directory(const std::string &name);
 
   /**
    * Opens the file at the given location relative to this directory, or creates
    * a new file if no file exists at that location.
    */
-  File &open_file(const std::filesystem::path &path) noexcept;
+  File &open_file(const std::string &name) noexcept;
 
   /**
    * Opens the directory with the given name, or creates a new directory if no
    * directory with a matching name exists.
    */
-  Directory &open_directory(const std::filesystem::path &path) noexcept;
+  Directory &open_directory(const std::string &name) noexcept;
+
+  void create_file(const std::string &name) noexcept;
+  void create_directory(const std::string &name) noexcept;
+
+  std::filesystem::path get_path() const noexcept;
+  Directory &get_parent() const;
 
 private:
-  bool entry_exists(const std::filesystem::path &path) noexcept;
-  void try_cache_file(const std::filesystem::path &path) noexcept;
-  void try_cache_directory(const std::filesystem::path &path) noexcept;
+  friend FileSystem;
+  Directory(const std::filesystem::path &path, Directory *parent) noexcept;
 
-  ReadWriteGuard rw_guard;
+  bool file_exists(const std::string &name) const noexcept;
+  bool directory_exists(const std::string &name) const noexcept;
+  bool file_is_cached(const std::string &name) const noexcept;
+  bool directory_is_cached(const std::string &name) const noexcept;
 
-  std::filesystem::path path;
-  std::unordered_map<std::string, File> cached_files;
-  std::unordered_map<std::string, Directory> cached_directories;
+  void cache_file(const std::string &name) noexcept;
+  void cache_directory(const std::string &name) noexcept;
+
+  std::shared_mutex rw_mutex;
+
+  Directory *parent;
+  std::filesystem::path path; // This is absolute.
+  std::unordered_map<std::string, std::unique_ptr<File>> cached_files;
+  std::unordered_map<std::string, std::unique_ptr<Directory>>
+      cached_directories;
 };
 
 /**
@@ -230,8 +153,7 @@ private:
  */
 class FileSystem final {
 public:
-  FileSystem(const std::filesystem::path &path) noexcept;
-  ~FileSystem() = default;
+  explicit FileSystem(const std::filesystem::path &path) noexcept;
 
   FileSystem(const FileSystem &) = delete;
   FileSystem operator=(const FileSystem &) = delete;
@@ -242,7 +164,6 @@ public:
    * Blocks until write access is available.
    */
   File &open_file(const std::filesystem::path &path);
-
   Directory &open_directory(const std::filesystem::path &path);
 
   Directory &get_root_directory() noexcept;
