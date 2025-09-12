@@ -27,9 +27,9 @@ public:
       : Exception(what) {}
 };
 
-class FileNotFoundException : public FileSystemException {
+class EntryNotFoundException : public FileSystemException {
 public:
-  FileNotFoundException(const char *what = "FileNotFound exception") noexcept
+  EntryNotFoundException(const char *what = "EntryNotFound exception") noexcept
       : FileSystemException(what) {}
 };
 
@@ -81,6 +81,16 @@ private:
   friend Directory;
   explicit File(const std::filesystem::path &path) noexcept;
 
+  /*
+   * Lockless variants of basic read/write operations. Used to orchestrate more
+   * complex operations which require the same lock throughout.
+   */
+  void clear_no_lock() noexcept;
+  void write_no_lock(const std::string &data,
+                     const std::size_t &count) noexcept;
+  std::string read_no_lock(const std::size_t &pos,
+                           const std::size_t &count) noexcept;
+
   std::shared_mutex rw_mutex;
 
   std::filesystem::path path;
@@ -121,6 +131,7 @@ public:
   void create_file(const std::string &name) noexcept;
   void create_directory(const std::string &name) noexcept;
 
+  std::string get_name() const noexcept;
   std::filesystem::path get_path() const noexcept;
   Directory &get_parent() const;
 
@@ -139,7 +150,7 @@ private:
   std::shared_mutex rw_mutex;
 
   Directory *parent;
-  std::filesystem::path path; // This is absolute.
+  std::filesystem::path path;
   std::unordered_map<std::string, std::unique_ptr<File>> cached_files;
   std::unordered_map<std::string, std::unique_ptr<Directory>>
       cached_directories;

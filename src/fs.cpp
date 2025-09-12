@@ -1,40 +1,55 @@
 #include "junco/fs.hpp"
 #include <filesystem> // std::filesystem
 #include <mutex>
-#include <sstream> // std::stringstream
 
 namespace junco {
 File::File(const std::filesystem::path &_path) noexcept
     : path(_path), fstream(path, std::ios::in | std::ios::out | std::ios::ate) {
 }
 
-std::string File::get_contents() noexcept { return read(0, get_size()); }
+std::string File::get_contents() noexcept {
+  auto lock = std::unique_lock(rw_mutex);
+  return read_no_lock(0, get_size());
+}
 std::string File::read(const std::size_t &pos,
                        const std::size_t &count) noexcept {
+  // This has to be a unique lock because of seekg.
+  auto lock = std::unique_lock(rw_mutex);
+  return read_no_lock(pos, count);
+}
+std::string File::read_no_lock(const std::size_t &pos,
+                               const std::size_t &count) noexcept {
   auto buff = std::string(count, '\0');
-  {
-    // This has to be a unique lock because of seekg.
-    auto lock = std::unique_lock(rw_mutex);
-    fstream.clear();
-    fstream.seekg(pos, std::ios::beg);
-    fstream.read(&buff[0], count);
-  }
+  fstream.clear();
+  fstream.seekg(pos, std::ios::beg);
+  fstream.read(&buff[0], count);
   return buff;
 }
 
 void File::set_contents(const std::string &new_contents) noexcept {
-  clear();
-  write(new_contents, 0);
+  auto lock = std::unique_lock(rw_mutex);
+  clear_no_lock();
+  write_no_lock(new_contents, 0);
 }
 void File::clear() noexcept {
   auto lock = std::unique_lock(rw_mutex);
+  clear_no_lock();
+}
+void File::clear_no_lock() noexcept {
   // Re-open filestream with truncate flag to clear contents
   fstream.close();
   fstream.open(path, std::ios::in | std::ios::out | std::ios::trunc);
 }
-void File::append(const std::string &data) noexcept { write(data, get_size()); }
+void File::append(const std::string &data) noexcept {
+  auto lock = std::unique_lock(rw_mutex);
+  write_no_lock(data, get_size());
+}
 void File::write(const std::string &data, const std::size_t &pos) noexcept {
   auto lock = std::unique_lock(rw_mutex);
+  write_no_lock(data, pos);
+}
+void File::write_no_lock(const std::string &data,
+                         const std::size_t &pos) noexcept {
   fstream.clear();
   fstream.seekp(pos, std::ios::beg);
   fstream.write(data.c_str(), data.size());
@@ -71,7 +86,7 @@ Directory::Directory(const std::filesystem::path &_path,
 
 File &Directory::get_file(const std::string &name) {
   if (!file_exists(name))
-    throw InvalidPathException("get_file() given name of non-file object");
+    throw EntryNotFoundException("Could not find given file");
   if (!file_is_cached(name))
     cache_file(name);
   auto lock = std::shared_lock(rw_mutex);
@@ -79,8 +94,7 @@ File &Directory::get_file(const std::string &name) {
 }
 Directory &Directory::get_directory(const std::string &name) {
   if (!directory_exists(name))
-    throw InvalidPathException(
-        ("get_directory() given name of non-directory object"));
+    throw EntryNotFoundException("Could not find given directory");
   if (!directory_is_cached(name))
     cache_directory(name);
   auto lock = std::shared_lock(rw_mutex);
@@ -97,6 +111,9 @@ Directory &Directory::open_directory(const std::string &name) noexcept {
   return get_directory(name);
 }
 
+std::string Directory::get_name() const noexcept {
+  return path.filename().string();
+}
 std::filesystem::path Directory::get_path() const noexcept { return path; }
 Directory &Directory::get_parent() const {
   if (!parent)
@@ -160,9 +177,9 @@ File &FileSystem::open_file(const std::filesystem::path &path) {
     auto entry_name = it->string();
     if (it == --path.end())
       return current_dir->open_file(entry_name);
-    current_dir = &current_dir->get_directory(entry_name);
+    current_dir = &current_dir->open_directory(entry_name);
   }
-  throw FileNotFoundException("Could not find file at the given location");
+  throw EntryNotFoundException("Could not find file at the given location");
 }
 Directory &FileSystem::open_directory(const std::filesystem::path &path) {
   if (!path.is_relative())
@@ -180,7 +197,7 @@ Directory &FileSystem::open_directory(const std::filesystem::path &path) {
     else
       current_dir = &current_dir->get_directory(entry_name);
   }
-  throw FileNotFoundException("Could not find file at the given location");
+  throw EntryNotFoundException("Could not find file at the given location");
 }
 Directory &FileSystem::get_root_directory() noexcept { return root; }
 
